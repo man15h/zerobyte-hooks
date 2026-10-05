@@ -1,0 +1,36 @@
+# Hooks for the zerobyte-hooks sidecar (github.com/adnanh/webhook, via the
+# ghcr.io/thecatlady/webhook image — see ./Dockerfile).
+#
+# Two fixed hooks, not one pair per host: ZeroByte's own pre/post-backup
+# webhook payload already carries sourcePath (the Directory volume's path,
+# e.g. /staging/web1 — https://zerobyte.app/docs/guides/backup-webhooks)
+# and, on post-backup, status. Every backup job's Advanced section
+# points at these same two URLs regardless of how many hosts are
+# configured; adding a host is a targets.yaml entry, not a new hook or a
+# rebuilt image.
+#
+# sourcePath is attacker-adjacent (it comes straight from the incoming
+# request body, gated only by ZeroByte's own WEBHOOK_ALLOWED_ORIGINS), so
+# scripts/pull.sh and scripts/cleanup.sh re-derive a host name from it and
+# validate that name against targets.yaml before touching anything — see
+# their own comments for exactly what that check rejects.
+
+- id: pull
+  execute-command: /etc/webhook/scripts/pull.sh
+  command-working-directory: /etc/webhook
+  include-command-output-in-response: true
+  include-command-output-in-response-on-error: true
+  pass-arguments-to-command:
+    - source: payload
+      name: sourcePath
+
+- id: cleanup
+  execute-command: /etc/webhook/scripts/cleanup.sh
+  command-working-directory: /etc/webhook
+  include-command-output-in-response: true
+  include-command-output-in-response-on-error: true
+  pass-arguments-to-command:
+    - source: payload
+      name: sourcePath
+    - source: payload
+      name: status
